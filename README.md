@@ -52,6 +52,15 @@ already in") rather than an error.
 Any static host. Push the repo and point Vercel / Netlify / GitHub Pages at
 the root — there's nothing to compile.
 
+On Vercel: import the repo, framework preset **Other**, and leave the build
+command and output directory empty. `vercel.json` sets a few baseline
+security headers.
+
+It deliberately does *not* set long-lived cache headers. Filenames here
+aren't content-hashed, so an `immutable` policy on `assets/` would leave
+browsers pinned to a stale `config.js` after you change the brand name or the
+interest list. Vercel's defaults revalidate correctly.
+
 ---
 
 ## What's where
