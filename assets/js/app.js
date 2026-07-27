@@ -231,29 +231,31 @@
     return Promise.resolve({ duplicate: false });
   }
 
+  /* Posts to the `subscribe` edge function rather than straight to the table.
+     The function holds the service-role key, so it can write the row and send
+     the confirmation email in one hop; the browser has no write access to
+     the subscribers table at all. */
   function saveToSupabase(record) {
     var s = CFG.supabase;
-    var endpoint = s.url.replace(/\/+$/, "") + "/rest/v1/" +
-                   encodeURIComponent(s.table);
+    var endpoint = s.url.replace(/\/+$/, "") + "/functions/v1/subscribe";
 
     return fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "apikey": s.anonKey,
-        "Authorization": "Bearer " + s.anonKey,
-        "Prefer": "return=minimal"
+        "Authorization": "Bearer " + s.anonKey
       },
       body: JSON.stringify(record)
     }).then(function (res) {
-      if (res.ok) return { duplicate: false };
-
-      /* 409 = unique violation on email. Already subscribed is a good
-         outcome, not an error — show the same happy state. */
-      if (res.status === 409) return { duplicate: true };
-
-      return res.text().then(function (body) {
-        throw new Error("Supabase " + res.status + ": " + body.slice(0, 300));
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok) {
+          throw new Error("subscribe " + res.status + ": " +
+                          (data.error || "unknown") +
+                          (data.fields ? " [" + data.fields.join(", ") + "]" : ""));
+        }
+        /* Already on the list is a good outcome, not an error. */
+        return { duplicate: !!data.duplicate, emailed: !!data.emailed || !!data.resent };
       });
     });
   }
@@ -294,7 +296,7 @@
     var save = supabaseReady() ? saveToSupabase(record) : saveLocally(record);
 
     save.then(function (result) {
-      showDone(record, result.duplicate);
+      showDone(record, result.duplicate, result.emailed);
     }).catch(function (err) {
       console.error("[SPOTTED] signup failed:", err);
       submit.disabled = false;
@@ -306,11 +308,18 @@
     });
   }
 
-  function showDone(record, duplicate) {
+  function showDone(record, duplicate, emailed) {
     setText("[data-done-name]", record.first_name);
     setText("[data-done-hood]", record.neighborhood);
     setText("[data-done-when]", (CFG.sendDay || "Thursday") + " morning, " +
                                 nextSendDate());
+
+    /* Only claim a confirmation email when one actually went out. */
+    var confirmLine = document.querySelector("[data-done-confirm]");
+    if (confirmLine && emailed) {
+      setText("[data-done-email]", record.email);
+      confirmLine.hidden = false;
+    }
 
     if (duplicate) {
       var kicker = document.querySelector(".done__kicker");

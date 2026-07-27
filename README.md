@@ -90,9 +90,48 @@ spelling when they match, which keeps "west village", "WEST VILLAGE", and
 
 ---
 
+## Email
+
+Signups post to the `subscribe` edge function, not to the table. The function
+holds the service-role key, writes the row, and sends a double opt-in email
+through [Resend](https://resend.com). The browser has no write access to
+`subscribers` at all.
+
+```
+supabase/functions/subscribe/     validates, inserts, sends the confirm email
+supabase/functions/confirm/       pending → confirmed
+supabase/functions/unsubscribe/   → unsubscribed
+supabase/functions/_shared/       email template + landing pages
+```
+
+### Secrets
+
+Set these under **Supabase → Project Settings → Edge Functions → Secrets**.
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected automatically.
+
+| Secret | Required | Notes |
+| --- | --- | --- |
+| `RESEND_API_KEY` | yes | Without it, signups still save and the page stops claiming an email was sent |
+| `FROM_EMAIL` | no | Defaults to Resend's shared `onboarding@resend.dev`. Set a verified domain before real sends |
+
+Nothing hard-fails when `RESEND_API_KEY` is missing: the row commits, the
+function logs a warning, and the success page omits the "check your inbox"
+line rather than promising mail that isn't coming.
+
+### Why unsubscribe splits GET and POST
+
+`GET /unsubscribe` renders a one-button confirmation page; `POST` performs the
+write. Corporate mail scanners and link-preview bots fetch every URL in an
+inbound email, and if `GET` did the write those prefetches would silently
+unsubscribe people who never clicked. The `POST` also satisfies RFC 8058
+one-click, so a mail client's native unsubscribe button still works in one step.
+
+---
+
 ## Not built yet
 
-- Double opt-in confirmation email
-- Unsubscribe endpoint (the column exists, the route doesn't)
 - Content pipeline — sourcing and assembling the actual issues
 - Admin view of the subscriber list
+- Rate limiting on `subscribe`. It's a public endpoint that sends mail, so it
+  is abusable for mailbombing a single address; Resend's own limits are
+  currently the only ceiling.
