@@ -42,8 +42,8 @@ window.SPOTTED_CONFIG = {
      security on the table is what actually protects the data. See
      supabase/migrations/ for the schema and policies.                   */
   supabase: {
-    url: "",           // e.g. "https://xxxxxxxx.supabase.co"
-    anonKey: "",       // publishable "anon" key
+    url: "https://bmtcbhgzmuktibtqjqco.supabase.co",
+    anonKey: "sb_publishable_3p94FolkVEhAt8KHl3dQ7g_6WiaMXmg",
     table: "subscribers"
   }
 };
