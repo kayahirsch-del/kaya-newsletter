@@ -13,6 +13,20 @@
    What it adds over the licence feed: taste. A licence says a place exists; an
    editor saying it's worth going is a quality signal, and that's the half the
    licence data can't give us.
+
+   Taste cuts both ways, though. Gothamist's main feed is a general news feed —
+   the first run pulled five-alarm fires, two stabbings and an alternate-side
+   parking story alongside the one good restaurant round-up. A neighborhood
+   name in a headline means the story is *about* here; it does not mean it
+   belongs in this newsletter. So each feed carries its own filters in
+   `content_sources.config`, tunable without a redeploy:
+
+     allow_paths  URL path fragments that must appear (e.g. "/food/")
+     deny_paths   URL path fragments that disqualify  (e.g. "/news/")
+     deny_words   headline words that disqualify regardless of path
+
+   Paths are the precise filter where a publication namespaces its sections;
+   deny_words is the backstop for the ones that don't.
    =========================================================================== */
 
 import { CORS, json } from "../_shared/brand.ts";
@@ -29,7 +43,14 @@ const restHeaders = {
 
 const SOURCE_ID = "editorial";
 
-type Feed = { name: string; url: string; category: string };
+type Feed = {
+  name: string;
+  url: string;
+  category: string;
+  allow_paths?: string[];
+  deny_paths?: string[];
+  deny_words?: string[];
+};
 type Entry = { title: string; link: string; summary: string; published?: string };
 
 /* ── tiny feed parser ──────────────────────────────────────────────────────
@@ -137,8 +158,33 @@ Deno.serve(async (req) => {
     return null;
   }
 
+  /* Words that mean "this is the news", not "this is your week". Applied to
+     every feed on top of whatever per-feed rules exist, because a story about
+     a shooting on your block is still a story about your block — the
+     neighborhood match can't tell the difference and shouldn't have to. */
+  const globalDeny: string[] = source.config?.deny_words ?? [];
+
+  function wanted(feed: Feed, entry: Entry): boolean {
+    const path = (() => {
+      try { return new URL(entry.link).pathname.toLowerCase(); }
+      catch { return entry.link.toLowerCase(); }
+    })();
+
+    if (feed.allow_paths?.length &&
+        !feed.allow_paths.some((p) => path.includes(p.toLowerCase()))) {
+      return false;
+    }
+    if (feed.deny_paths?.some((p) => path.includes(p.toLowerCase()))) return false;
+
+    const hay = ` ${entry.title.toLowerCase()} `;
+    const deny = [...globalDeny, ...(feed.deny_words ?? [])];
+    /* Padded match so "fire" doesn't reject "firehouse martini". */
+    return !deny.some((w) => hay.includes(` ${w.toLowerCase()} `));
+  }
+
   let fetched = 0;
   let noHood = 0;
+  let filtered = 0;
   const items: Record<string, unknown>[] = [];
   const failures: string[] = [];
 
@@ -157,6 +203,8 @@ Deno.serve(async (req) => {
 
     for (const entry of parseFeed(xml)) {
       fetched++;
+      if (!wanted(feed, entry)) { filtered++; continue; }
+
       const hood = findHood(`${entry.title} ${entry.summary}`);
       if (!hood) { noHood++; continue; }
 
@@ -184,7 +232,10 @@ Deno.serve(async (req) => {
       last_error: failures.join("; ").slice(0, 400) || null,
       last_count: 0,
     });
-    return json({ ok: true, fetched, no_neighborhood: noHood, upserted: 0, failures });
+    return json({
+      ok: true, fetched, off_topic: filtered, no_neighborhood: noHood,
+      upserted: 0, failures,
+    });
   }
 
   /* Two feeds can carry the same story; keep one row per URL. */
@@ -220,6 +271,7 @@ Deno.serve(async (req) => {
   return json({
     ok: true,
     fetched,
+    off_topic: filtered,
     no_neighborhood: noHood,
     upserted: unique.length,
     failures,

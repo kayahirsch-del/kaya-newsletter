@@ -123,6 +123,8 @@ Set these under **Supabase → Project Settings → Edge Functions → Secrets**
 | `FROM_EMAIL` | no | Defaults to Resend's shared `onboarding@resend.dev`. Set a verified domain before real sends |
 | `REPLY_TO` | no | Only needed once mail comes from an address nobody reads |
 | `ADMIN_TOKEN` | for `/review` | Shared secret for the back office. Unset means `review` refuses every request |
+| `INBOUND_SECRET` | for sale email | Shared secret the Cloudflare Email Worker sends. Unset means `ingest-sale-email` refuses every request |
+| `ANTHROPIC_API_KEY` | for sale email | Used to pull structured sales out of announcement emails |
 
 ### Why the landing pages aren't served by the functions
 
@@ -162,9 +164,11 @@ rather than a migration. Per-source settings live in `content_sources.config`
 as JSONB, so retuning a filter needs no redeploy.
 
 ```
-supabase/functions/ingest-nysla/  NY liquor licences -> candidates
-supabase/functions/review/        back-office list/update API
-review.html                       the triage queue
+supabase/functions/ingest-nysla/       NY liquor licences -> candidates
+supabase/functions/ingest-editorial/   local publications -> candidates
+supabase/functions/ingest-sale-email/  sample sale announcements -> candidates
+supabase/functions/review/             back-office list/update API
+review.html                            the triage queue
 ```
 
 ### Why liquor licences
@@ -186,6 +190,47 @@ Two known sources of noise, deliberately left in rather than filtered blind:
 The Socrata fetch is capped at 1000 rows and does not paginate yet, so a long
 lookback silently truncates.
 
+### Why editorial feeds
+
+A licence proves a venue exists. It has no opinion about whether it's any
+good, which is the half that decides whether an item is worth printing. Eater
+NY, Gothamist and Secret NYC publish RSS/Atom feeds; we read the headline,
+their own summary and the link, and file anything naming a neighborhood we
+serve. Article bodies are never stored. The publication keeps the traffic.
+
+Each feed carries its own topic filters in `content_sources.config` —
+`allow_paths`, `deny_paths`, `deny_words` — tunable without a redeploy. They
+exist because the first unfiltered run pulled a five-alarm fire, two stabbings
+and an alternate-side parking story into a newsletter about where to eat. All
+three genuinely name neighborhoods we serve. A neighborhood match proves a
+story is *about* here; it says nothing about whether it belongs.
+
+### Why sample sales arrive by email
+
+The Haul's obvious source is the sale calendars that aggregate this stuff.
+The two best ones say no, in the one place a publisher gets to say it:
+
+- `vipsamplesale.com/robots.txt` names `anthropic-ai`, `ClaudeBot`, `GPTBot`,
+  `CCBot`, `Bytespider` and a dozen more as disallowed
+- `soifferhaskin.com/robots.txt` is `Disallow: /` with an allowlist of search
+  engines we are not on
+
+So we don't fetch them. Every one of these vendors runs a mailing list and
+wants the sale attended, so `sales@itsallheresay.com` subscribes and reads
+what they send. Consent is explicit, the feed can't break from a markup
+change, and the announcement carries brand, dates, hours and street address —
+more than the listing pages render.
+
+Cloudflare Email Routing catches the mail and an Email Worker POSTs it to
+`ingest-sale-email`, which asks Claude to pull the structured sale out of the
+marketing copy. Setup steps are in the worker file itself
+(`supabase/functions/ingest-sale-email/cloudflare-email-worker.js`).
+
+The email is treated as untrusted input, because an inbox is a channel anyone
+can write to: the extraction prompt says so, and the model's only permitted
+output is a tool call against a fixed schema. Everything still lands as
+`status = 'new'` for a human.
+
 ### The review queue
 
 `/review` on the deployed site. It is `noindex` and gated on `ADMIN_TOKEN`,
@@ -204,7 +249,8 @@ status changes apply optimistically, reverting if the server refuses.
 
 ## Not built yet
 
-- The Lineup and The Haul have no sources yet — only The Table is fed
+- The Lineup has no source yet. Secret NYC feeds it incidentally; real event
+  listings (Ticketmaster, Bandsintown, Dice, RA) aren't wired up
 - Pagination on the Socrata fetch
 - Issue assembly: turning approved items into a sent newsletter
 - Admin view of the subscriber list
