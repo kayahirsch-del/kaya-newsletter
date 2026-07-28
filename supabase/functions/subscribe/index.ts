@@ -14,6 +14,11 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const RESEND_KEY = Deno.env.get("RESEND_API_KEY");
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") ?? `${BRAND} <onboarding@resend.dev>`;
 
+/* Optional. Replies already go to FROM_EMAIL, so this only matters once mail
+   is sent from an address nobody reads — a `news@` subdomain, say. Set the
+   REPLY_TO secret then; leaving it unset omits the header entirely. */
+const REPLY_TO = Deno.env.get("REPLY_TO");
+
 const REST = `${SUPABASE_URL}/rest/v1/subscribers`;
 const FUNCTIONS = `${SUPABASE_URL}/functions/v1`;
 
@@ -61,11 +66,13 @@ async function sendConfirmation(row: Record<string, string>) {
       body: JSON.stringify({
         from: FROM_EMAIL,
         to: [row.email],
+        ...(REPLY_TO ? { reply_to: REPLY_TO } : {}),
         subject: `Confirm your ${BRAND} subscription`,
         html,
         text,
         headers: {
           "List-Unsubscribe": `<${FUNCTIONS}/unsubscribe?token=${row.unsubscribe_token}>`,
+          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         },
       }),
     });
