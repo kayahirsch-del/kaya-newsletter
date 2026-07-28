@@ -112,7 +112,23 @@ Set these under **Supabase → Project Settings → Edge Functions → Secrets**
 | Secret | Required | Notes |
 | --- | --- | --- |
 | `RESEND_API_KEY` | yes | Without it, signups still save and the page stops claiming an email was sent |
+| `SITE_URL` | yes | Origin of the deployed site, e.g. `https://spotted-newsletter.vercel.app`, no trailing slash. Where the emailed links land |
 | `FROM_EMAIL` | no | Defaults to Resend's shared `onboarding@resend.dev`. Set a verified domain before real sends |
+
+### Why the landing pages aren't served by the functions
+
+Supabase's gateway rewrites every edge function response to
+`Content-Type: text/plain` and attaches
+`content-security-policy: default-src 'none'; sandbox`. A browser will not
+render markup returned from `*.supabase.co` — it displays the source as text.
+
+So `confirm` and `unsubscribe` do the database write and then `302` to
+`confirmed.html` / `unsubscribe.html` on the static site, passing state in the
+query string. Those pages read the state with `textContent`, never `innerHTML`,
+since the values arrive from the URL.
+
+If `SITE_URL` is unset the functions still perform the write correctly, but
+they have nowhere to send the browser and fall back to a plain-text message.
 
 Nothing hard-fails when `RESEND_API_KEY` is missing: the row commits, the
 function logs a warning, and the success page omits the "check your inbox"

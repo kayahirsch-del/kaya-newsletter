@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>You're in — SPOTTED</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💋</text></svg>" />
+<style>
+  .standalone {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .standalone .done { max-width: 480px; }
+</style>
+</head>
+<body>
+
+<main class="standalone">
+  <div class="done">
+    <p class="done__kicker" data-kicker>Confirmed</p>
+    <h1 class="done__title" data-title>You're in.</h1>
+    <p class="done__body" data-body>Your first issue lands Thursday morning.</p>
+    <p class="done__sign">xoxo</p>
+    <p style="margin-top:28px;">
+      <a class="btn btn--sm" href="/">Back to SPOTTED</a>
+    </p>
+  </div>
+</main>
+
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var state = q.get("state") || "confirmed";
+  var name = (q.get("name") || "").slice(0, 80);
+  var hood = (q.get("hood") || "").slice(0, 80);
+
+  var copy = {
+    confirmed: {
+      kicker: "Confirmed",
+      title: name ? "You're in, " + name + "." : "You're in.",
+      body: "Your first " + (hood || "neighborhood") + " issue lands Thursday " +
+            "morning. Add us to your contacts so it doesn't get filed under Promotions."
+    },
+    already: {
+      kicker: "Already done",
+      title: "You're confirmed.",
+      body: "Nothing else to do — your " + (hood || "next") + " issue is on its way."
+    },
+    unsubscribed: {
+      kicker: "Heads up",
+      title: "You've unsubscribed.",
+      body: "This address opted out. Sign up again if that was a mistake."
+    },
+    invalid: {
+      kicker: "Hmm",
+      title: "We don't recognize that link.",
+      body: "It may have already been used. Sign up again and we'll send a fresh one."
+    }
+  };
+
+  var c = copy[state] || copy.invalid;
+
+  /* textContent throughout — these values come from the query string. */
+  document.querySelector("[data-kicker]").textContent = c.kicker;
+  document.querySelector("[data-title]").textContent = c.title;
+  document.querySelector("[data-body]").textContent = c.body;
+  document.title = c.title + " — SPOTTED";
+})();
+</script>
+
+</body>
+</html>

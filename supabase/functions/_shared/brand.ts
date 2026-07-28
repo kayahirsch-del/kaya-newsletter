@@ -1,6 +1,11 @@
-/* Shared brand chrome for SPOTTED's transactional email and landing pages.
-   Email clients don't load webfonts reliably, so the display face falls back
-   through Didot to Georgia rather than depending on Bodoni Moda. */
+/* Shared brand chrome for SPOTTED's transactional email.
+
+   Note there is no HTML-page helper here on purpose. Supabase's gateway
+   rewrites every edge function response to `Content-Type: text/plain` and
+   attaches `content-security-policy: default-src 'none'; sandbox`, so a
+   browser will never render markup served from *.supabase.co — it shows the
+   source as text instead. User-facing pages therefore live on the static
+   site, and these functions redirect to them. */
 
 export const BRAND = "SPOTTED";
 
@@ -18,6 +23,41 @@ export const CORS = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
+
+/* Where the static pages live, e.g. https://spotted.vercel.app */
+export const SITE_URL = (Deno.env.get("SITE_URL") ?? "").replace(/\/+$/, "");
+
+/* 302 to a page on the static site. When SITE_URL isn't configured we can't
+   redirect anywhere useful, so fall back to plain text — which is the only
+   thing the gateway will render from this origin anyway. */
+export function redirect(path: string, params: Record<string, string> = {}) {
+  if (!SITE_URL) {
+    console.warn("SITE_URL unset — cannot redirect to the static site");
+    return new Response(
+      "Done. Head back to the site — SITE_URL is not configured on this function.",
+      { status: 200, headers: { "Content-Type": "text/plain; charset=utf-8", ...CORS } },
+    );
+  }
+
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, v]) => v),
+  ).toString();
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: `${SITE_URL}${path}${qs ? "?" + qs : ""}`,
+      "Cache-Control": "no-store",
+      ...CORS,
+    },
+  });
+}
+
+export const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...CORS },
+  });
 
 /* ── confirmation email ─────────────────────────────────────────────────── */
 
@@ -99,55 +139,4 @@ export function confirmEmail(opts: {
 </body></html>`;
 
   return { html, text };
-}
-
-/* ── landing pages for the emailed links ────────────────────────────────── */
-
-export function page(opts: {
-  kicker: string;
-  title: string;
-  body: string;
-  action?: { url: string; label: string };
-  status?: number;
-}) {
-  const { kicker, title, body, action, status = 200 } = opts;
-
-  const button = action
-    ? `<form method="POST" action="${action.url}" style="margin-top:28px;">
-         <button type="submit"
-           style="font-family:${SANS};font-size:15px;font-weight:600;color:${PAPER};
-                  background:${INK};border:none;border-radius:999px;
-                  padding:14px 32px;cursor:pointer;">${action.label}</button>
-       </form>`
-    : "";
-
-  const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} — ${BRAND}</title>
-<style>
-  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-       background:${PAPER};color:${INK};font-family:${SANS};padding:24px;}
-  .card{max-width:460px;text-align:center;}
-  .kicker{font-size:12px;letter-spacing:.24em;text-transform:uppercase;
-          color:${POP};font-weight:700;margin:0 0 16px;}
-  h1{margin:0;font-family:${SERIF};font-weight:700;font-size:clamp(2rem,6vw,2.8rem);
-     line-height:1.1;}
-  p{margin:18px 0 0;font-size:16px;line-height:1.6;color:${INK_2};}
-  .mark{margin-top:40px;font-family:${SERIF};font-weight:800;font-size:15px;
-        letter-spacing:.18em;color:${INK};}
-  button:hover{background:${POP};}
-</style></head>
-<body><div class="card">
-  <p class="kicker">${kicker}</p>
-  <h1>${title}</h1>
-  <p>${body}</p>
-  ${button}
-  <p class="mark">${BRAND}</p>
-</div></body></html>`;
-
-  return new Response(html, {
-    status,
-    headers: { "Content-Type": "text/html; charset=utf-8", ...CORS },
-  });
 }

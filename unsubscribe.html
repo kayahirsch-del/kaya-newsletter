@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Unsubscribe — SPOTTED</title>
+<meta name="robots" content="noindex" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💋</text></svg>" />
+<style>
+  .standalone {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .standalone .done { max-width: 480px; }
+</style>
+</head>
+<body>
+
+<main class="standalone">
+  <div class="done">
+    <p class="done__kicker" data-kicker>Before you go</p>
+    <h1 class="done__title" data-title>Unsubscribe from SPOTTED?</h1>
+    <p class="done__body" data-body>
+      You'll stop getting issues immediately. You can always sign up again.
+    </p>
+
+    <p style="margin-top:28px;" data-actions>
+      <button type="button" class="btn btn--lg" data-confirm>Yes, unsubscribe me</button>
+    </p>
+
+    <p style="margin-top:20px;" data-home hidden>
+      <a class="btn btn--sm" href="/">Back to SPOTTED</a>
+    </p>
+  </div>
+</main>
+
+<script src="assets/js/config.js"></script>
+<script>
+(function () {
+  var CFG = window.SPOTTED_CONFIG || {};
+  var token = new URLSearchParams(location.search).get("token") || "";
+
+  var kicker  = document.querySelector("[data-kicker]");
+  var title   = document.querySelector("[data-title]");
+  var body    = document.querySelector("[data-body]");
+  var actions = document.querySelector("[data-actions]");
+  var home    = document.querySelector("[data-home]");
+  var button  = document.querySelector("[data-confirm]");
+
+  function show(k, t, b) {
+    kicker.textContent = k;
+    title.textContent = t;
+    body.textContent = b;
+    actions.hidden = true;
+    home.hidden = false;
+  }
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) {
+    show("Hmm", "That link looks broken.",
+         "Check that you copied the whole thing, or reply to any issue and we'll remove you by hand.");
+    return;
+  }
+
+  button.addEventListener("click", function () {
+    button.disabled = true;
+    button.textContent = "One second…";
+
+    var s = CFG.supabase || {};
+    var endpoint = s.url.replace(/\/+$/, "") + "/functions/v1/unsubscribe?token=" +
+                   encodeURIComponent(token);
+
+    fetch(endpoint, { method: "POST" })
+      .then(function (res) { return res.json().catch(function () { return {}; }); })
+      .then(function (data) {
+        if (data.ok) {
+          show("Done", "You're unsubscribed.",
+               "No hard feelings. If you change your mind, the signup page is always open.");
+        } else if (data.already) {
+          show("Already done", "You're unsubscribed.",
+               "We won't email you again. Nothing else to do.");
+        } else {
+          throw new Error(data.error || "failed");
+        }
+      })
+      .catch(function () {
+        button.disabled = false;
+        button.textContent = "Yes, unsubscribe me";
+        body.textContent = "That didn't go through. Try again in a moment, or reply " +
+                           "to any issue and we'll remove you by hand.";
+      });
+  });
+})();
+</script>
+
+</body>
+</html>
