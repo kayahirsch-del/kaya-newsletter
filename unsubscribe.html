@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Unsubscribe — SPOTTED</title>
+<title>Unsubscribe — HERESAY</title>
 <meta name="robots" content="noindex" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/styles.css" />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💋</text></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>" />
 <style>
   .standalone {
     min-height: 100vh;
@@ -26,7 +26,7 @@
 <main class="standalone">
   <div class="done">
     <p class="done__kicker" data-kicker>Before you go</p>
-    <h1 class="done__title" data-title>Unsubscribe from SPOTTED?</h1>
+    <h1 class="done__title" data-title>Unsubscribe from HERESAY?</h1>
     <p class="done__body" data-body>
       You'll stop getting issues immediately. You can always sign up again.
     </p>
@@ -36,7 +36,7 @@
     </p>
 
     <p style="margin-top:20px;" data-home hidden>
-      <a class="btn btn--sm" href="/">Back to SPOTTED</a>
+      <a class="btn btn--sm" href="/">Back to <span class="brand-lead">HERE</span>SAY</a>
     </p>
   </div>
 </main>
@@ -44,7 +44,7 @@
 <script src="assets/js/config.js"></script>
 <script>
 (function () {
-  var CFG = window.SPOTTED_CONFIG || {};
+  var CFG = window.HERESAY_CONFIG || {};
   var token = new URLSearchParams(location.search).get("token") || "";
 
   var kicker  = document.querySelector("[data-kicker]");

@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>SPOTTED — the newsletter for your block</title>
+<title>HERESAY — what's happening, where you are</title>
 <meta name="description" content="A weekly dispatch of the restaurants, sample sales, and shows worth leaving the apartment for — tuned to your exact neighborhood." />
 
-<meta property="og:title" content="SPOTTED — the newsletter for your block" />
+<meta property="og:title" content="HERESAY — what's happening, where you are" />
 <meta property="og:description" content="Restaurants, sample sales, and shows worth leaving the apartment for. Tuned to your exact neighborhood." />
 <meta property="og:type" content="website" />
 
@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="assets/css/styles.css" />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💋</text></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>" />
 </head>
 <body>
 
@@ -41,7 +41,7 @@
 <!-- ── nav ────────────────────────────────────────────────────────── -->
 <header class="nav">
   <a class="wordmark" href="#top">
-    <span class="wordmark__text" data-brand>SPOTTED</span>
+    <span class="wordmark__text"><span class="brand-lead">HERE</span>SAY</span>
   </a>
   <a class="btn btn--sm" href="#join">Join the list</a>
 </header>
@@ -52,8 +52,8 @@
   <section class="hero">
     <p class="eyebrow">Hyperlocal &middot; weekly &middot; free</p>
     <h1 class="hero__title">
-      Spotted: everything<br />
-      happening on <em>your</em> block.
+      You'll hear it<br />
+      <em>here</em> first.
     </h1>
     <p class="hero__sub">
       The restaurants worth the wait, the sample sales worth the line, and the
@@ -62,6 +62,25 @@
     </p>
     <a class="btn btn--lg" href="#join">Get my first issue &rarr;</a>
     <p class="hero__fine">Free forever. One email a week. Unsubscribe in one click.</p>
+  </section>
+
+  <!-- ── the name ─────────────────────────────────────────────────── -->
+  <section class="define" aria-label="About the name">
+    <dl class="define__entry">
+      <dt class="define__word">
+        <span class="brand-lead">here</span>&middot;say
+        <span class="define__pron">&#124; ˈhir-ˌsā &#124;</span>
+        <span class="define__pos">noun</span>
+      </dt>
+      <dd class="define__sense">
+        <span class="define__num">1.</span> Word going around; the thing everyone
+        seems to know but nobody printed.
+      </dd>
+      <dd class="define__sense">
+        <span class="define__num">2.</span> Specifically, the word going around
+        <em>here</em> &mdash; your ten blocks, your week.
+      </dd>
+    </dl>
   </section>
 
   <!-- ── the three beats ──────────────────────────────────────────── -->
@@ -105,7 +124,7 @@
 
     <div class="issue" aria-live="polite">
       <div class="issue__chrome">
-        <span class="issue__from">SPOTTED</span>
+        <span class="issue__from"><span class="brand-lead">HERE</span>SAY</span>
         <span class="issue__date" data-preview-date>Thursday</span>
       </div>
       <div class="issue__body">
@@ -116,23 +135,23 @@
 
         <div class="issue__item">
           <span class="issue__tag">The Haul</span>
-          <p><strong>Spotted:</strong> a two-day sample sale four blocks from
+          <p><strong>Heard:</strong> a two-day sample sale four blocks from
              you. Doors at 10, everything under $90, and the good sizes are gone
              by noon &mdash; go Thursday, not Saturday.</p>
         </div>
         <div class="issue__item">
           <span class="issue__tag">The Table</span>
-          <p><strong>Spotted:</strong> the tiny pasta place with no sign has
+          <p><strong>Heard:</strong> the tiny pasta place with no sign has
              started taking walk-ins before 6. That's the window. Use it.</p>
         </div>
         <div class="issue__item">
           <span class="issue__tag">The Lineup</span>
-          <p><strong>Spotted:</strong> tickets for the venue down the street go
+          <p><strong>Heard:</strong> tickets for the venue down the street go
              on sale Wednesday at 10am. Presale code is in this email, because
              of course it is.</p>
         </div>
 
-        <p class="issue__sign">xoxo</p>
+        <p class="issue__sign">You didn't hear it from us.</p>
       </div>
     </div>
   </section>
@@ -219,7 +238,10 @@
       <!-- success state -->
       <div class="done" data-done hidden>
         <p class="done__kicker">You're in.</p>
-        <h2 class="done__title">Welcome to <span data-brand>SPOTTED</span>,<br /><span data-done-name>you</span>.</h2>
+        <h2 class="done__title">
+          Welcome to <span class="brand-lead">HERE</span>SAY,<br /><span data-done-name>you</span>.
+        </h2>
+
         <!-- Shown only when the confirmation email actually went out. -->
         <p class="done__body" data-done-confirm hidden>
           Check your inbox &mdash; we sent a confirmation link to
@@ -230,7 +252,7 @@
           <strong data-done-when>Thursday morning</strong>. Add us to your
           contacts now so it doesn't get filed under Promotions.
         </p>
-        <p class="done__sign">xoxo</p>
+        <p class="done__sign">You didn't hear it from us.</p>
       </div>
     </div>
   </section>
@@ -238,7 +260,7 @@
 </main>
 
 <footer class="footer">
-  <p class="footer__mark" data-brand>SPOTTED</p>
+  <p class="footer__mark"><span class="brand-lead">HERE</span>SAY</p>
   <p class="footer__line">Written by people who live there too.</p>
 </footer>
 

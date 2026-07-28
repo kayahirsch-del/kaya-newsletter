@@ -1,13 +1,13 @@
 /* ==========================================================================
-   SPOTTED — signup page behaviour
+   HERESAY — signup page behaviour
    No framework, no build step. Load order: config.js, neighborhoods.js, app.js
    ========================================================================== */
 
 (function () {
   "use strict";
 
-  var CFG    = window.SPOTTED_CONFIG || {};
-  var CITIES = window.SPOTTED_CITIES || [];
+  var CFG    = window.HERESAY_CONFIG || {};
+  var CITIES = window.HERESAY_CITIES || [];
 
   var form   = document.getElementById("signup-form");
   var doneEl = document.querySelector("[data-done]");
@@ -220,14 +220,14 @@
 
   function saveLocally(record) {
     try {
-      var key = "spotted:subscribers";
+      var key = "heresay:subscribers";
       var all = JSON.parse(localStorage.getItem(key) || "[]");
       all.push(record);
       localStorage.setItem(key, JSON.stringify(all));
     } catch (e) {
       /* private browsing, quota, etc. — the signup still "succeeds" visually */
     }
-    console.info("[SPOTTED] Supabase not configured; stored locally:", record);
+    console.info("[HERESAY] Supabase not configured; stored locally:", record);
     return Promise.resolve({ duplicate: false });
   }
 
@@ -298,7 +298,7 @@
     save.then(function (result) {
       showDone(record, result.duplicate, result.emailed);
     }).catch(function (err) {
-      console.error("[SPOTTED] signup failed:", err);
+      console.error("[HERESAY] signup failed:", err);
       submit.disabled = false;
       submit.textContent = "Put me on the list";
       status.hidden = false;
@@ -334,8 +334,6 @@
   /* ── wire up ─────────────────────────────────────────────────────────── */
 
   function init() {
-    setText("[data-brand]", CFG.brand || "SPOTTED");
-
     buildCities();
     buildInterests();
     buildCadence();

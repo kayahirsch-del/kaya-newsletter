@@ -1,5 +1,5 @@
 -- ===========================================================================
--- SPOTTED — subscribers table
+-- HERESAY — subscribers table
 -- ===========================================================================
 
 create extension if not exists pgcrypto;

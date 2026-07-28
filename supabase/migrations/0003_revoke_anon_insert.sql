@@ -1,5 +1,5 @@
 -- ===========================================================================
--- SPOTTED — withdraw the anon insert grant
+-- HERESAY — withdraw the anon insert grant
 --
 -- NOT YET APPLIED. Run this only once the client that posts to the
 -- `subscribe` edge function is actually deployed and serving.

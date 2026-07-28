@@ -1,4 +1,4 @@
-# SPOTTED
+# HERESAY
 
 A hyperlocal newsletter for young women — the restaurants, sample sales, and
 shows worth leaving the apartment for, filtered down to one neighborhood.
@@ -7,8 +7,15 @@ This repo is the **signup page**: a landing page + personalization form that
 captures name, email, city, neighborhood, optional street address, interests,
 and send cadence.
 
-`SPOTTED` is a working title. It lives in one place — `brand` in
-`assets/js/config.js` — so renaming is a one-line change.
+The name is a pun that has to be seen to land: **HERE**SAY, as in what's
+happening *here*. Spoken aloud it's just "hearsay", so the wordmark carries
+the joke — `.brand-lead` wraps the first four letters wherever the name
+appears. A dictionary entry under the hero explains it once, in the site's
+own voice.
+
+Because it needs markup rather than a plain string, the name is not a config
+value. It lives in the HTML, and in `BRAND` in
+`supabase/functions/_shared/brand.ts` for email.
 
 ---
 
@@ -58,8 +65,8 @@ security headers.
 
 It deliberately does *not* set long-lived cache headers. Filenames here
 aren't content-hashed, so an `immutable` policy on `assets/` would leave
-browsers pinned to a stale `config.js` after you change the brand name or the
-interest list. Vercel's defaults revalidate correctly.
+browsers pinned to a stale `config.js` after you change the interest list or
+the Supabase credentials. Vercel's defaults revalidate correctly.
 
 ---
 
@@ -68,7 +75,7 @@ interest list. Vercel's defaults revalidate correctly.
 ```
 index.html                              landing page + signup form
 assets/css/styles.css                   all styling
-assets/js/config.js                     brand, interests, cadences, Supabase creds
+assets/js/config.js                     interests, cadences, Supabase creds
 assets/js/neighborhoods.js              city → neighborhood lists
 assets/js/app.js                        form building, validation, submit
 supabase/migrations/0001_*.sql          subscribers table, indexes, RLS
@@ -82,7 +89,7 @@ is what gets stored, so don't change ids once real people have signed up.
 
 ### Adding a city
 
-Append to `SPOTTED_CITIES` in `assets/js/neighborhoods.js`. The neighborhood
+Append to `HERESAY_CITIES` in `assets/js/neighborhoods.js`. The neighborhood
 field is free text with autocomplete, so anything missing from the list can
 still be typed; `normalizeHood()` snaps typed values onto the canonical
 spelling when they match, which keeps "west village", "WEST VILLAGE", and
@@ -101,7 +108,7 @@ through [Resend](https://resend.com). The browser has no write access to
 supabase/functions/subscribe/     validates, inserts, sends the confirm email
 supabase/functions/confirm/       pending → confirmed
 supabase/functions/unsubscribe/   → unsubscribed
-supabase/functions/_shared/       email template + landing pages
+supabase/functions/_shared/       email template, redirect helper, brand name
 ```
 
 ### Secrets
@@ -136,8 +143,8 @@ line rather than promising mail that isn't coming.
 
 ### Why unsubscribe splits GET and POST
 
-`GET /unsubscribe` renders a one-button confirmation page; `POST` performs the
-write. Corporate mail scanners and link-preview bots fetch every URL in an
+`GET /unsubscribe` redirects to a one-button confirmation page; `POST` performs
+the write. Corporate mail scanners and link-preview bots fetch every URL in an
 inbound email, and if `GET` did the write those prefetches would silently
 unsubscribe people who never clicked. The `POST` also satisfies RFC 8058
 one-click, so a mail client's native unsubscribe button still works in one step.

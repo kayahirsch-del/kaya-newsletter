@@ -1,12 +1,14 @@
 /* ==========================================================================
-   SPOTTED — configuration
+   HERESAY — configuration
    Everything you'd want to rename or re-tune lives in this one file.
    ========================================================================== */
 
-window.SPOTTED_CONFIG = {
+window.HERESAY_CONFIG = {
 
-  /* Brand name. Change it here and it updates everywhere on the page. */
-  brand: "SPOTTED",
+  /* The name is not configurable from here. The wordmark splits HERE from SAY
+     so the pun reads visually, which needs markup rather than a string — see
+     `.brand-lead` in the HTML and stylesheet. For email it lives in
+     `BRAND` in supabase/functions/_shared/brand.ts. */
 
   /* Day the issue goes out — used in the preview and the success message. */
   sendDay: "Thursday",

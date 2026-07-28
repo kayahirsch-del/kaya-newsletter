@@ -1,5 +1,5 @@
 /* ==========================================================================
-   SPOTTED — hyperlocal newsletter signup
+   HERESAY — hyperlocal newsletter signup
    Palette: warm cream paper, near-black ink, lipstick pop.
    ========================================================================== */
 
@@ -94,6 +94,10 @@ p { margin: 0; }
   letter-spacing: .14em;
 }
 
+/* The pun is load-bearing: HEREsay, as in what's happening here. Spoken aloud
+   it's just "hearsay", so the wordmark is the only place the joke can live. */
+.brand-lead { color: var(--pop); }
+
 /* ── buttons ─────────────────────────────────────────────────────────── */
 .btn {
   display: inline-block;
@@ -153,6 +157,55 @@ p { margin: 0; }
   margin-top: 18px;
   font-size: 13px;
   color: var(--ink-3);
+}
+
+/* ── the name ────────────────────────────────────────────────────────── */
+.define {
+  max-width: 660px;
+  margin: 0 auto;
+  padding: 0 24px 84px;
+}
+.define__entry {
+  margin: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 28px 0;
+}
+.define__word {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: clamp(1.5rem, 3.6vw, 2rem);
+  letter-spacing: -.01em;
+}
+.define__pron,
+.define__pos {
+  font-family: var(--sans);
+  font-size: 13.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--ink-3);
+  margin-left: 8px;
+}
+.define__pos { font-style: italic; }
+.define__sense {
+  margin: 12px 0 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--ink-2);
+  padding-left: 26px;
+  text-indent: -26px;
+}
+.define__num {
+  display: inline-block;
+  width: 26px;
+  text-indent: 0;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.define__sense em {
+  font-style: italic;
+  color: var(--pop);
+  font-weight: 500;
 }
 
 /* ── section titles ──────────────────────────────────────────────────── */

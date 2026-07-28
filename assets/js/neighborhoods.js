@@ -1,10 +1,10 @@
 /* ==========================================================================
-   SPOTTED — city + neighborhood data
+   HERESAY — city + neighborhood data
    The neighborhood field is a free-text input with autocomplete, so anything
    missing here can still be typed. Add cities as you expand.
    ========================================================================== */
 
-window.SPOTTED_CITIES = [
+window.HERESAY_CITIES = [
   {
     id: "nyc",
     label: "New York",

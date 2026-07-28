@@ -1,4 +1,4 @@
-/* Shared brand chrome for SPOTTED's transactional email.
+/* Shared brand chrome for HERESAY's transactional email.
 
    Note there is no HTML-page helper here on purpose. Supabase's gateway
    rewrites every edge function response to `Content-Type: text/plain` and
@@ -7,7 +7,7 @@
    source as text instead. User-facing pages therefore live on the static
    site, and these functions redirect to them. */
 
-export const BRAND = "SPOTTED";
+export const BRAND = "HERESAY";
 
 const PAPER = "#FAF3EA";
 const INK = "#14100E";
@@ -24,7 +24,7 @@ export const CORS = {
   "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
 };
 
-/* Where the static pages live, e.g. https://spotted.vercel.app */
+/* Where the static pages live, e.g. https://heresay.com */
 export const SITE_URL = (Deno.env.get("SITE_URL") ?? "").replace(/\/+$/, "");
 
 /* 302 to a page on the static site. When SITE_URL isn't configured we can't
@@ -93,7 +93,7 @@ export function confirmEmail(opts: {
 
   <tr><td style="background:${INK};padding:14px 24px;">
     <span style="font-family:${SERIF};font-size:15px;font-weight:700;letter-spacing:.18em;color:${PAPER};">
-      ${BRAND}
+      <span style="color:${POP};">HERE</span>SAY
     </span>
   </td></tr>
 
@@ -123,7 +123,7 @@ export function confirmEmail(opts: {
     </p>
 
     <p style="margin:24px 0 0;font-family:${SERIF};font-style:italic;font-size:19px;color:${POP};">
-      xoxo
+      You didn't hear it from us.
     </p>
   </td></tr>
 

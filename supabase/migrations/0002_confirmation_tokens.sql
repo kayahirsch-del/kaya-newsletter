@@ -1,5 +1,5 @@
 -- ===========================================================================
--- SPOTTED — double opt-in + unsubscribe tokens
+-- HERESAY — double opt-in + unsubscribe tokens
 --
 -- Tokens only. The anon insert policy stays in place here: the browser still
 -- writes through PostgREST at this point, and revoking it would break signups
