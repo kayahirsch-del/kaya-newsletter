@@ -121,6 +121,8 @@ Set these under **Supabase → Project Settings → Edge Functions → Secrets**
 | `RESEND_API_KEY` | yes | Without it, signups still save and the page stops claiming an email was sent |
 | `SITE_URL` | yes | Origin of the deployed site, e.g. `https://spotted-newsletter.vercel.app`, no trailing slash. Where the emailed links land |
 | `FROM_EMAIL` | no | Defaults to Resend's shared `onboarding@resend.dev`. Set a verified domain before real sends |
+| `REPLY_TO` | no | Only needed once mail comes from an address nobody reads |
+| `ADMIN_TOKEN` | for `/review` | Shared secret for the back office. Unset means `review` refuses every request |
 
 ### Why the landing pages aren't served by the functions
 
@@ -151,9 +153,60 @@ one-click, so a mail client's native unsubscribe button still works in one step.
 
 ---
 
+## Content pipeline
+
+Ingestion fills `items` with candidates; a human approves what ships.
+`cities`, `content_sources`, `items` and `postal_neighborhoods` are all
+multi-city from the start, so adding a city is data plus a source adapter
+rather than a migration. Per-source settings live in `content_sources.config`
+as JSONB, so retuning a filter needs no redeploy.
+
+```
+supabase/functions/ingest-nysla/  NY liquor licences -> candidates
+supabase/functions/review/        back-office list/update API
+review.html                       the triage queue
+```
+
+### Why liquor licences
+
+A licence is issued before a venue opens, so it surfaces bars and restaurants
+ahead of any listings site — and it's public record, free, structured and
+geocoded.
+
+Ingestion is recall-first: everything lands as `status = 'new'` for a human.
+Two known sources of noise, deliberately left in rather than filtered blind:
+
+- The dataset is *current active licences*, so a renewal or class change at a
+  long-established venue gets a fresh issue date and looks new.
+- ZIP-to-neighborhood is coarse. `10001` spans Chelsea, Koreatown and Hudson
+  Yards; `10011` spans Chelsea and the West Village. `lat`/`lng` is stored on
+  every row, so moving to point-in-polygon (PostGIS + NTA boundaries) needs no
+  re-ingest.
+
+The Socrata fetch is capped at 1000 rows and does not paginate yet, so a long
+lookback silently truncates.
+
+### The review queue
+
+`/review` on the deployed site. It is `noindex` and gated on `ADMIN_TOKEN`,
+which the browser keeps in `localStorage` and sends in the request body.
+
+That single shared secret is a deliberate choice for a one-person tool, not a
+security claim: anyone holding it can read and re-status every item. It is
+scoped to `items` only — the `review` function has no path to `subscribers`.
+Move to Supabase Auth before a second person needs access.
+
+Triage is keyboard-driven — <kbd>J</kbd>/<kbd>K</kbd> to move,
+<kbd>A</kbd> approve, <kbd>R</kbd> reject, <kbd>U</kbd> back to new — and
+status changes apply optimistically, reverting if the server refuses.
+
+---
+
 ## Not built yet
 
-- Content pipeline — sourcing and assembling the actual issues
+- The Lineup and The Haul have no sources yet — only The Table is fed
+- Pagination on the Socrata fetch
+- Issue assembly: turning approved items into a sent newsletter
 - Admin view of the subscriber list
 - Rate limiting on `subscribe`. It's a public endpoint that sends mail, so it
   is abusable for mailbombing a single address; Resend's own limits are

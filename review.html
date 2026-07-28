@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Review — HERESAY</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..900;1,6..96,400..900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/styles.css" />
+<link rel="stylesheet" href="assets/css/review.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>" />
+</head>
+<body class="review-body">
+
+<!-- ── token gate ─────────────────────────────────────────────────────── -->
+<div class="gate" data-gate>
+  <form class="gate__card" data-gate-form>
+    <p class="done__kicker">Back office</p>
+    <h1 class="gate__title"><span class="brand-lead">HERE</span>SAY review</h1>
+    <p class="gate__note">Paste the admin token. It's kept in this browser only.</p>
+    <input type="password" class="gate__input" data-token
+           placeholder="Admin token" autocomplete="current-password" />
+    <button type="submit" class="btn btn--lg btn--full">Unlock</button>
+    <p class="gate__err" data-gate-err hidden></p>
+  </form>
+</div>
+
+<!-- ── app ────────────────────────────────────────────────────────────── -->
+<main class="review" data-app hidden>
+
+  <header class="review__bar">
+    <span class="review__mark"><span class="brand-lead">HERE</span>SAY</span>
+    <nav class="tabs" data-tabs>
+      <button class="tab" data-status="new">New</button>
+      <button class="tab" data-status="approved">Approved</button>
+      <button class="tab" data-status="rejected">Rejected</button>
+      <button class="tab" data-status="published">Published</button>
+    </nav>
+    <button class="btn btn--sm review__lock" data-lock>Lock</button>
+  </header>
+
+  <div class="review__filters">
+    <select class="review__select" data-hood>
+      <option value="">All neighborhoods</option>
+    </select>
+    <input type="search" class="review__search" data-q
+           placeholder="Search name or street…" />
+    <span class="review__count" data-count></span>
+  </div>
+
+  <p class="review__hint">
+    <kbd>J</kbd>/<kbd>K</kbd> move &middot; <kbd>A</kbd> approve &middot;
+    <kbd>R</kbd> reject &middot; <kbd>U</kbd> back to new
+  </p>
+
+  <div class="queue" data-queue aria-live="polite"></div>
+
+  <div class="review__more">
+    <button class="btn btn--sm" data-more hidden>Load more</button>
+    <p class="review__empty" data-empty hidden>Nothing here.</p>
+  </div>
+
+</main>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/review.js"></script>
+</body>
+</html>
