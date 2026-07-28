@@ -1,17 +1,18 @@
 -- ===========================================================================
 -- HERESAY — withdraw the anon insert grant
 --
--- NOT YET APPLIED. Run this only once the client that posts to the
--- `subscribe` edge function is actually deployed and serving.
+-- Applied. Signups go through the `subscribe` edge function, which holds the
+-- service-role key, so the browser needs no write access to this table.
 --
--- Ordering matters: the previously deployed client wrote to PostgREST
--- directly. Dropping this policy before the new bundle is live would
--- 401 every signup in the gap, including anyone holding a cached copy of
--- the old JavaScript.
+-- Ordering mattered: the earlier client wrote to PostgREST directly, and
+-- dropping this policy before that bundle was replaced would have 401'd every
+-- signup in the gap, including anyone holding cached JavaScript.
 --
--- After this runs, `subscribers` has RLS enabled and zero policies, so every
--- anonymous operation is denied. The edge functions use the service-role key,
--- which bypasses RLS, and are the only writers.
+-- `subscribers` now has RLS enabled and zero policies, so every anonymous
+-- operation is denied. Supabase's linter reports this as
+-- `rls_enabled_no_policy` at INFO level — that is the intended end state
+-- here, not a finding: the table is deliberately unreachable by the anon
+-- role, and the edge functions bypass RLS via the service-role key.
 -- ===========================================================================
 
 drop policy if exists "anon can subscribe" on public.subscribers;
