@@ -138,8 +138,8 @@ Deno.serve(async (req) => {
     const [existing] = await lookup.json().catch(() => []);
 
     if (existing?.status === "pending") {
-      await sendConfirmation(existing);
-      return json({ ok: true, duplicate: true, resent: true });
+      const delivery = await sendConfirmation(existing);
+      return json({ ok: true, duplicate: true, resent: delivery.sent });
     }
     return json({ ok: true, duplicate: true, resent: false });
   }
