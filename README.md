@@ -66,7 +66,27 @@ security headers.
 It deliberately does *not* set long-lived cache headers. Filenames here
 aren't content-hashed, so an `immutable` policy on `assets/` would leave
 browsers pinned to a stale `config.js` after you change the interest list or
-the Supabase credentials. Vercel's defaults revalidate correctly.
+the Supabase credentials.
+
+Leaving it to Vercel's defaults was not enough, though — that claim used to
+live here and it was wrong. When the beat tabs shipped, browsers took the new
+`review.html` and kept the old `review.css` and `review.js`, so the new nav
+rendered as unstyled browser buttons wired to nothing. Markup and the assets
+it depends on are one unit; splitting them across a cache boundary breaks the
+page in a way that looks like broken code.
+
+Two things now prevent it:
+
+- `vercel.json` sets `Cache-Control: public, max-age=0, must-revalidate` on
+  `/assets/(.*)`, so a browser always asks before reusing a copy. The files
+  are small and a `304` is cheap.
+- Every asset URL carries a `?v=` query string. **Bump it whenever you change
+  a file under `assets/`** — a new URL can't hit an old cache entry. This is
+  the belt to the header's braces, and it's the one that works even when a
+  proxy or an aggressive browser ignores the header.
+
+The real fix is content-hashed filenames, which needs a build step this repo
+deliberately doesn't have.
 
 ---
 
