@@ -58,6 +58,12 @@ const restHeaders = {
    cost of the system prompt is amortised. */
 const BATCH = 20;
 
+/* Batches run concurrently. One batch of 20 takes about a minute, and 366
+   items sequentially is nineteen minutes — well past the wall clock an edge
+   function gets. Three at a time keeps a call to roughly a minute, which is
+   also what fits comfortably under the invocation limit. */
+const CONCURRENCY = 3;
+
 function tokenOk(given: unknown): boolean {
   if (!ADMIN_TOKEN || typeof given !== "string") return false;
   const a = new TextEncoder().encode(given);
@@ -230,17 +236,28 @@ Deno.serve(async (req) => {
   const samples: Record<string, unknown>[] = [];
   const failures: string[] = [];
 
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH);
+  /* Split into batches up front, then run them CONCURRENCY at a time. */
+  const batches: Row[][] = [];
+  for (let i = 0; i < rows.length; i += BATCH) batches.push(rows.slice(i, i + BATCH));
 
-    let verdicts: Verdict[];
-    try {
-      verdicts = await describeBatch(batch);
-    } catch (err) {
-      failures.push(`batch ${i / BATCH}: ${String(err).slice(0, 120)}`);
-      continue;
-    }
+  const results: { batch: Row[]; verdicts: Verdict[] }[] = [];
+  for (let w = 0; w < batches.length; w += CONCURRENCY) {
+    const wave = batches.slice(w, w + CONCURRENCY);
+    const settled = await Promise.allSettled(wave.map((b) => describeBatch(b)));
 
+    settled.forEach((s, n) => {
+      if (s.status === "fulfilled") {
+        results.push({ batch: wave[n], verdicts: s.value });
+      } else {
+        /* One bad batch shouldn't lose the wave — the rows it covered simply
+           keep their placeholder and get picked up on the next run, since the
+           query selects on the placeholder text. */
+        failures.push(`batch ${w + n}: ${String(s.reason).slice(0, 120)}`);
+      }
+    });
+  }
+
+  for (const { batch, verdicts } of results) {
     const patches: { id: string; patch: Record<string, unknown> }[] = [];
 
     for (const v of verdicts) {
@@ -288,14 +305,17 @@ Deno.serve(async (req) => {
       });
     }
 
+    /* Each row gets a different patch, so this is one request per row rather
+       than a bulk upsert. Issued together — twenty sequential round trips to
+       PostgREST is most of a batch's wall clock for no reason. */
     if (!dryRun) {
-      for (const p of patches) {
-        await fetch(`${REST}/items?id=eq.${p.id}`, {
+      await Promise.all(patches.map((p) =>
+        fetch(`${REST}/items?id=eq.${p.id}`, {
           method: "PATCH",
           headers: { ...restHeaders, Prefer: "return=minimal" },
           body: JSON.stringify(p.patch),
-        });
-      }
+        })
+      ));
     }
   }
 
