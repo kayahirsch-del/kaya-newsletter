@@ -245,6 +245,17 @@ Triage is keyboard-driven — <kbd>J</kbd>/<kbd>K</kbd> to move,
 <kbd>A</kbd> approve, <kbd>R</kbd> reject, <kbd>U</kbd> back to new — and
 status changes apply optimistically, reverting if the server refuses.
 
+The queue splits by beat — The Table, The Lineup, The Haul — because judging
+a restaurant and judging a sample sale are different jobs: one is "is this
+any good", the other is "is it worth the trip and is it still on". Mixing
+them in one list makes you switch modes on every card. The chosen beat is
+remembered in `localStorage`.
+
+Each row of tabs counts inside the other's filter: the status tabs count
+within the chosen beat, the beat tabs within the chosen status. A count that
+doesn't predict what clicking will show is worse than no count. Empty beats
+dim rather than disappear, so the row doesn't reshuffle mid-triage.
+
 ---
 
 ## Not built yet

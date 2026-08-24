@@ -3,7 +3,8 @@
 
    Back-office API for triaging the candidate pool. Two actions:
 
-     { action: "list",   token, city_id?, status?, neighborhood?, q?, limit?, offset? }
+     { action: "list",   token, city_id?, status?, category?, neighborhood?,
+                         q?, limit?, offset? }
      { action: "update", token, ids: [...], status?, notes? }
 
    Auth is a single shared secret in the ADMIN_TOKEN secret. That is a
@@ -29,6 +30,12 @@ const restHeaders = {
 };
 
 const STATUSES = ["new", "approved", "rejected", "published"];
+
+/* The three beats on the site, plus the catch-all. Restaurants and sample
+   sales are different jobs — you judge a restaurant on whether it's any good
+   and a sale on whether it's worth the trip and still running — so the queue
+   lets you take one beat at a time instead of interleaving them. */
+const CATEGORIES = ["table", "lineup", "haul", "other"];
 
 /* Length-independent compare, so a wrong token leaks nothing through timing. */
 function tokenOk(given: unknown): boolean {
@@ -69,6 +76,12 @@ Deno.serve(async (req) => {
     const limit = Math.min(Number(body.limit ?? 50), 200);
     const offset = Math.max(Number(body.offset ?? 0), 0);
 
+    /* Absent or unrecognised means every beat — the filter is opt-in. */
+    const category = CATEGORIES.includes(String(body.category))
+      ? String(body.category)
+      : "";
+    const catFilter = category ? `&category=eq.${category}` : "";
+
     const params = new URLSearchParams({
       select:
         "id,title,blurb,address,neighborhood,postal_code,category,source_id," +
@@ -80,6 +93,7 @@ Deno.serve(async (req) => {
       offset: String(offset),
     });
 
+    if (category) params.set("category", `eq.${category}`);
     if (body.neighborhood) {
       params.set("neighborhood", `eq.${String(body.neighborhood)}`);
     }
@@ -103,21 +117,41 @@ Deno.serve(async (req) => {
       (res.headers.get("content-range") ?? "").split("/")[1] ?? items.length,
     );
 
-    /* Counts per status, so the tabs can show numbers. */
-    const counts: Record<string, number> = {};
-    await Promise.all(STATUSES.map(async (s) => {
-      const r = await fetch(
-        `${REST}/items?select=id&city_id=eq.${cityId}&status=eq.${s}&limit=1`,
-        { headers: { ...restHeaders, Prefer: "count=exact" } },
-      );
-      counts[s] = Number(
-        (r.headers.get("content-range") ?? "").split("/")[1] ?? 0,
-      );
-    }));
+    /* A count only helps if it predicts what clicking will show, so each row
+       of tabs is counted inside the other's current filter: the status tabs
+       count within the chosen beat, the beat tabs within the chosen status.
+       Otherwise "New (406)" next to an empty Haul queue is just confusing. */
+    const countOf = async (qs: string) => {
+      const r = await fetch(`${REST}/items?select=id&${qs}&limit=1`, {
+        headers: { ...restHeaders, Prefer: "count=exact" },
+      });
+      return Number((r.headers.get("content-range") ?? "").split("/")[1] ?? 0);
+    };
 
-    /* Neighborhoods present in this city, for the filter dropdown. */
+    const counts: Record<string, number> = {};
+    const categoryCounts: Record<string, number> = {};
+
+    await Promise.all([
+      ...STATUSES.map(async (s) => {
+        counts[s] = await countOf(
+          `city_id=eq.${cityId}&status=eq.${s}${catFilter}`,
+        );
+      }),
+      ...CATEGORIES.map(async (c) => {
+        categoryCounts[c] = await countOf(
+          `city_id=eq.${cityId}&status=eq.${status}&category=eq.${c}`,
+        );
+      }),
+      countOf(`city_id=eq.${cityId}&status=eq.${status}`)
+        .then((n) => { categoryCounts.all = n; }),
+    ]);
+
+    /* Neighborhoods present in this city, for the filter dropdown. Scoped to
+       the current beat so picking The Haul doesn't offer you neighborhoods
+       that only ever had restaurants in them. */
     const hoodRes = await fetch(
-      `${REST}/items?select=neighborhood&city_id=eq.${cityId}&neighborhood=not.is.null`,
+      `${REST}/items?select=neighborhood&city_id=eq.${cityId}` +
+        `&neighborhood=not.is.null${catFilter}`,
       { headers: restHeaders },
     );
     const hoodRows: { neighborhood: string }[] = await hoodRes.json()
@@ -125,7 +159,15 @@ Deno.serve(async (req) => {
     const neighborhoods = [...new Set(hoodRows.map((h) => h.neighborhood))]
       .sort();
 
-    return json({ ok: true, items, total, counts, neighborhoods });
+    return json({
+      ok: true,
+      items,
+      total,
+      counts,
+      categoryCounts,
+      category,
+      neighborhoods,
+    });
   }
 
   /* ── update ───────────────────────────────────────────────────────────── */
