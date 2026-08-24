@@ -41,6 +41,17 @@
     <button class="btn btn--sm review__lock" data-lock>Lock</button>
   </header>
 
+  <!-- The beats, as they appear on the site. Judging a restaurant and judging
+       a sample sale are different jobs; this keeps them out of each other's
+       way instead of interleaving them in one list. -->
+  <nav class="beats-nav" data-beats>
+    <button class="beat" data-category="" aria-selected="true">Everything</button>
+    <button class="beat" data-category="table">The Table</button>
+    <button class="beat" data-category="lineup">The Lineup</button>
+    <button class="beat" data-category="haul">The Haul</button>
+    <button class="beat" data-category="other">Other</button>
+  </nav>
+
   <div class="review__filters">
     <select class="review__select" data-hood>
       <option value="">All neighborhoods</option>

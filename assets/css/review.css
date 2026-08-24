@@ -90,6 +90,36 @@
   font-weight: 600;
 }
 
+/* ── beats ───────────────────────────────────────────────────────────── */
+.beats-nav {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 18px 0 4px;
+  border-bottom: 1px solid var(--line);
+}
+.beat {
+  font-family: var(--serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-3);
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 6px 4px 10px;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease;
+}
+.beat:hover { color: var(--ink); }
+.beat[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--pop);
+}
+/* Empty beats stay in place rather than disappearing — a row that reshuffles
+   as you triage is a row you misclick. */
+.beat[data-empty="true"]:not([aria-selected="true"]) { opacity: .45; }
+
 /* ── filters ─────────────────────────────────────────────────────────── */
 .review__filters {
   display: flex;
@@ -177,6 +207,19 @@
 .card__hood--none {
   color: var(--ink-3);
   background: var(--paper-3);
+}
+
+/* Which beat an item belongs to, shown only in the Everything view — inside a
+   single beat it would be the same word on every card. */
+.card__beat {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
 }
 .card__meta {
   font-size: 13.5px;

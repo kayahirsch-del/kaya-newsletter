@@ -11,7 +11,17 @@
   var ENDPOINT = (CFG.supabase.url || "").replace(/\/+$/, "") +
                  "/functions/v1/review";
   var KEY = "heresay:admin-token";
+  var BEAT_KEY = "heresay:review-beat";
   var PAGE = 50;
+
+  /* The site's names for the beats, so the back office and the newsletter
+     call the same thing the same thing. */
+  var BEAT_LABEL = {
+    table:  "The Table",
+    lineup: "The Lineup",
+    haul:   "The Haul",
+    other:  "Other"
+  };
 
   var els = {
     gate:     document.querySelector("[data-gate]"),
@@ -20,6 +30,7 @@
     token:    document.querySelector("[data-token]"),
     app:      document.querySelector("[data-app]"),
     tabs:     document.querySelector("[data-tabs]"),
+    beats:    document.querySelector("[data-beats]"),
     hood:     document.querySelector("[data-hood]"),
     q:        document.querySelector("[data-q]"),
     count:    document.querySelector("[data-count]"),
@@ -32,13 +43,15 @@
   var state = {
     token: localStorage.getItem(KEY) || "",
     status: "new",
+    /* Remembered across visits: triage tends to happen one beat at a time,
+       and re-picking it on every load gets old fast. */
+    category: localStorage.getItem(BEAT_KEY) || "",
     neighborhood: "",
     q: "",
     offset: 0,
     total: 0,
     items: [],
-    active: 0,
-    hoodsLoaded: false
+    active: 0
   };
 
   /* ── api ─────────────────────────────────────────────────────────────── */
@@ -91,6 +104,14 @@
     hood.className = "card__hood" + (item.neighborhood ? "" : " card__hood--none");
     hood.textContent = item.neighborhood || "no neighborhood";
     top.appendChild(hood);
+
+    /* Only worth showing when beats are mixed together. */
+    if (!state.category && item.category) {
+      var beat = document.createElement("span");
+      beat.className = "card__beat";
+      beat.textContent = BEAT_LABEL[item.category] || item.category;
+      top.appendChild(beat);
+    }
 
     el.appendChild(top);
 
@@ -169,15 +190,39 @@
     });
   }
 
+  function setBeats(counts) {
+    els.beats.querySelectorAll(".beat").forEach(function (b) {
+      var c = b.dataset.category || "all";
+      b.setAttribute("aria-selected", String(b.dataset.category === state.category));
+      var n = counts && counts[c];
+      b.textContent = b.textContent.replace(/\s*\(\d+\)$/, "") +
+                      (n ? " (" + n + ")" : "");
+      /* A beat with nothing in it still gets clicked by accident; dimming it
+         says "empty" without removing it and reshuffling the row. */
+      b.dataset.empty = String(!n);
+    });
+  }
+
+  /* The neighborhood list is scoped to the current beat, so it has to be
+     rebuilt when the beat changes rather than filled once. */
   function setHoods(list) {
-    if (state.hoodsLoaded) return;
+    var current = els.hood.value;
+    els.hood.textContent = "";
+    var all = document.createElement("option");
+    all.value = "";
+    all.textContent = "All neighborhoods";
+    els.hood.appendChild(all);
+
     list.forEach(function (h) {
       var o = document.createElement("option");
       o.value = h;
       o.textContent = h;
       els.hood.appendChild(o);
     });
-    state.hoodsLoaded = true;
+
+    /* Keep the filter if this beat still has that neighborhood. */
+    if (current && list.indexOf(current) >= 0) els.hood.value = current;
+    else if (current) state.neighborhood = "";
   }
 
   /* ── data ────────────────────────────────────────────────────────────── */
@@ -186,6 +231,7 @@
     return call({
       action: "list",
       status: state.status,
+      category: state.category || undefined,
       neighborhood: state.neighborhood || undefined,
       q: state.q || undefined,
       limit: PAGE,
@@ -196,6 +242,7 @@
       state.total = data.total;
       if (!append) state.active = 0;
       setTabs(data.counts);
+      setBeats(data.categoryCounts);
       setHoods(data.neighborhoods || []);
       render();
     }).catch(function (err) {
@@ -264,6 +311,14 @@
     var tab = e.target.closest(".tab");
     if (!tab) return;
     state.status = tab.dataset.status;
+    load(false);
+  });
+
+  els.beats.addEventListener("click", function (e) {
+    var beat = e.target.closest(".beat");
+    if (!beat) return;
+    state.category = beat.dataset.category;
+    localStorage.setItem(BEAT_KEY, state.category);
     load(false);
   });
 
