@@ -12,20 +12,44 @@
 
    Setup, in order:
      1. Cloudflare → itsallheresay.com → Email → Email Routing → enable
-     2. Add the destination address you want the raw mail archived at
+     2. Add and verify the destination address that gets a human copy
      3. Workers & Pages → Create → Worker → paste this
      4. Settings → Variables → add INBOUND_SECRET (same value as the Supabase
-        secret) and FUNCTION_URL
-     5. Email Routing → Routing rules → custom address `sales@` → send to this
+        secret), FUNCTION_URL, and ARCHIVE_TO
+     5. Deploy again — variables don't reach a running Worker until you do
+     6. Email Routing → Routing rules → custom address `sales@` → send to this
         Worker
-     6. Subscribe sales@itsallheresay.com to the vendor mailing lists
+     7. Subscribe sales@itsallheresay.com to the vendor mailing lists
 
-   Keep the plain forward in step 2. If the Worker throws, mail still lands
-   somewhere a human can read it, and a missed sale beats a silent drop.
+   Why it forwards as well as posts
+   --------------------------------
+   A routing rule sends mail to exactly one place, so pointing `sales@` at
+   this Worker means nothing else receives it. That breaks two things at once:
+
+     - Any confirmation email — a list's double opt-in, or Gmail's code when
+       you add this as a forwarding address — arrives here, gets parsed as a
+       sale, found not to be one, and discarded. You can never click the link
+       because you never see it.
+     - When the Worker throws, the message is gone with it.
+
+   So every message is also forwarded to ARCHIVE_TO, a verified destination.
+   The forward is what a human reads; the POST is what fills the queue. The
+   forward goes first and is awaited, because the ingest is the part we can
+   afford to lose.
    =========================================================================== */
 
 export default {
   async email(message, env, ctx) {
+    /* Awaited, not fired and forgotten: a confirmation link that never
+       arrives is worse than a sale that never gets filed. */
+    if (env.ARCHIVE_TO) {
+      try {
+        await message.forward(env.ARCHIVE_TO);
+      } catch (err) {
+        console.error("forward failed", err);
+      }
+    }
+
     const raw = await new Response(message.raw).text();
 
     const post = fetch(env.FUNCTION_URL, {
