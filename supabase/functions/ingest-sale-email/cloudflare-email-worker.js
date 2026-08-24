@@ -6,9 +6,18 @@
    new vendor. Paste it into a Worker and bind it under
    Email → Email Routing → Routing rules.
 
-   Cloudflare hands the Worker a raw RFC 822 stream. We pull the plain-text
-   part if there is one, fall back to the HTML part, and POST it on. All the
-   real parsing happens downstream — this is a pipe with a secret on it.
+   Why there's no parsing here any more
+   ------------------------------------
+   The first version pulled the text and HTML parts out of the raw message
+   before posting them. It worked on Gmail and returned both parts empty on
+   the first message from a different client — and because Workers Logs were
+   off, there was nothing to look at. The lesson wasn't "write a better
+   boundary split", it was that fragile code belongs where its logs are
+   readable. So this now forwards the message and posts the raw RFC 822
+   stream; the edge function does the parsing, and a bad decode shows up in
+   the Supabase function logs.
+
+   What's left here is hard to get wrong: forward, POST, don't bounce.
 
    Setup, in order:
      1. Cloudflare → itsallheresay.com → Email → Email Routing → enable
@@ -19,7 +28,9 @@
      5. Deploy again — variables don't reach a running Worker until you do
      6. Email Routing → Routing rules → custom address `sales@` → send to this
         Worker
-     7. Subscribe sales@itsallheresay.com to the vendor mailing lists
+     7. Turn on Observability → Workers Logs. Without it the console lines
+        below go nowhere, which is the hole that hid the bug above.
+     8. Subscribe sales@itsallheresay.com to the vendor mailing lists
 
    Why it forwards as well as posts
    --------------------------------
@@ -33,24 +44,28 @@
      - When the Worker throws, the message is gone with it.
 
    So every message is also forwarded to ARCHIVE_TO, a verified destination.
-   The forward is what a human reads; the POST is what fills the queue. The
-   forward goes first and is awaited, because the ingest is the part we can
-   afford to lose.
+   The forward is what a human reads; the POST is what fills the queue.
    =========================================================================== */
 
 export default {
   async email(message, env, ctx) {
-    /* Awaited, not fired and forgotten: a confirmation link that never
-       arrives is worse than a sale that never gets filed. */
+    /* Awaited and first: a confirmation link that never arrives is worse than
+       a sale that never gets filed. Failures are logged, never thrown —
+       throwing bounces the message back to the sender, and a vendor whose
+       mail bounces will eventually drop us from the list. */
     if (env.ARCHIVE_TO) {
       try {
         await message.forward(env.ARCHIVE_TO);
+        console.log("forwarded to", env.ARCHIVE_TO);
       } catch (err) {
-        console.error("forward failed", err);
+        console.error("forward failed", String(err));
       }
+    } else {
+      console.warn("ARCHIVE_TO unset — no human copy of this message");
     }
 
     const raw = await new Response(message.raw).text();
+    console.log("raw bytes", raw.length, "from", message.from);
 
     const post = fetch(env.FUNCTION_URL, {
       method: "POST",
@@ -62,42 +77,17 @@ export default {
         from: message.from,
         subject: message.headers.get("subject") ?? "",
         message_id: message.headers.get("message-id") ?? "",
-        text: part(raw, "text/plain"),
-        html: part(raw, "text/html"),
+        raw,
       }),
-    }).then((res) => {
-      /* Logged, not thrown. Rejecting the message would bounce it back to the
-         sender, which over time gets us dropped from the mailing lists we
-         went to the trouble of joining. */
-      if (!res.ok) console.error("ingest failed", res.status);
-    }).catch((err) => console.error("ingest error", err));
+    })
+      .then(async (res) => {
+        const detail = await res.text().catch(() => "");
+        if (res.ok) console.log("ingest ok", detail.slice(0, 200));
+        else console.error("ingest failed", res.status, detail.slice(0, 200));
+      })
+      .catch((err) => console.error("ingest error", String(err)));
 
-    /* Don't make the sender wait on our pipeline. */
+    /* Don't make the sending server wait on our pipeline. */
     ctx.waitUntil(post);
   },
 };
-
-/* Minimal MIME slice: find the boundary, return the first part with the
-   content type we asked for, undo quoted-printable if it's used. Marketing
-   mail is overwhelmingly multipart/alternative with exactly these two parts,
-   and anything this misses still reaches the model as the other part. */
-function part(raw, type) {
-  const boundary = raw.match(/boundary="?([^"\s;]+)"?/i)?.[1];
-  const chunks = boundary ? raw.split(`--${boundary}`) : [raw];
-
-  for (const chunk of chunks) {
-    if (!chunk.toLowerCase().includes(`content-type: ${type}`)) continue;
-
-    const split = chunk.indexOf("\r\n\r\n") >= 0 ? "\r\n\r\n" : "\n\n";
-    const body = chunk.slice(chunk.indexOf(split) + split.length).trim();
-
-    return /quoted-printable/i.test(chunk) ? unQP(body) : body;
-  }
-  return undefined;
-}
-
-function unQP(s) {
-  return s
-    .replace(/=\r?\n/g, "")
-    .replace(/=([0-9A-F]{2})/gi, (_, h) => String.fromCharCode(parseInt(h, 16)));
-}

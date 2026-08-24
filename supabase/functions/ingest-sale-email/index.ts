@@ -23,9 +23,15 @@
    The flow
    --------
    Cloudflare Email Routing catches mail to sales@itsallheresay.com and an
-   Email Worker POSTs the parsed message here. We ask Claude to pull the
-   structured sale out of the marketing copy, map the ZIP to a neighborhood,
-   and file it as `status = 'new'` for the review queue. Nothing auto-ships.
+   Email Worker forwards it to a human and POSTs the raw RFC 822 stream here.
+   We parse the MIME, ask Claude to pull the structured sale out of the
+   marketing copy, map the ZIP to a neighborhood, and file it as
+   `status = 'new'` for the review queue. Nothing auto-ships.
+
+   The MIME parsing used to happen in the Worker. It returned both parts
+   empty on the first message from a non-Gmail client, and with Workers Logs
+   off there was nothing to inspect — so it moved here, where a bad decode
+   lands in the function logs and a fix is a redeploy.
 
    Auth is a shared secret in `x-heresay-secret`, checked in constant time,
    failing closed when unset — same posture as the review endpoint. This is a
@@ -186,6 +192,135 @@ async function extract(
     .filter((s) => s?.brand && s?.blurb);
 }
 
+/* ── MIME ────────────────────────────────────────────────────────────────────
+   This used to live in the Cloudflare Worker, which was a mistake: the Worker
+   is the one component whose logs we can't read from here, and a crude
+   boundary split is exactly the code that needs iterating against real mail.
+   The first message from a client other than Gmail came through with both
+   parts empty and nothing to show why.
+
+   So the Worker is now a pipe — forward, POST the raw RFC 822 — and the
+   parsing happens here, where a bad decode shows up in the function logs and
+   a fix is a redeploy rather than a dashboard paste. */
+
+type Part = { type: string; body: string };
+
+function headerBlock(raw: string): { head: string; body: string } {
+  const at = raw.search(/\r?\n\r?\n/);
+  if (at < 0) return { head: raw, body: "" };
+  const gap = raw.slice(at).match(/^\r?\n\r?\n/)![0].length;
+  return { head: raw.slice(0, at), body: raw.slice(at + gap) };
+}
+
+/* Header values may be folded across lines — a continuation starts with
+   whitespace. Unfold before matching or a boundary can be cut in half:
+   `Content-Type: multipart/mixed;\n\tboundary="X"` is ordinary Apple Mail
+   output, and losing the second line loses the boundary.
+
+   The end-of-value lookahead is `(?![\s\S])`, not `$`, deliberately. The `m`
+   flag is needed so `^` finds the start of a header line — but it also makes
+   `$` match at every line break, which ends the lazy capture on the first
+   line and silently drops the fold. */
+function header(head: string, name: string): string {
+  const re = new RegExp(
+    `^${name}:[ \\t]*([\\s\\S]*?)(?=\\r?\\n[^ \\t]|(?![\\s\\S]))`,
+    "im",
+  );
+  const m = head.match(re);
+  return m ? m[1].replace(/\r?\n[ \t]+/g, " ").trim() : "";
+}
+
+function decodeBody(body: string, encoding: string): string {
+  const enc = encoding.toLowerCase();
+  if (enc.includes("base64")) {
+    try {
+      const bytes = Uint8Array.from(
+        atob(body.replace(/\s+/g, "")),
+        (c) => c.charCodeAt(0),
+      );
+      return new TextDecoder("utf-8").decode(bytes);
+    } catch {
+      return body;
+    }
+  }
+  if (enc.includes("quoted-printable")) {
+    return body
+      .replace(/=\r?\n/g, "")
+      .replace(
+        /((?:=[0-9A-F]{2})+)/gi,
+        (seq) => {
+          const bytes = Uint8Array.from(
+            seq.slice(1).split("=").map((h) => parseInt(h, 16)),
+          );
+          return new TextDecoder("utf-8").decode(bytes);
+        },
+      );
+  }
+  return body;
+}
+
+/* Walk the tree and collect every text part. Real mail nests — a
+   multipart/mixed wrapping a multipart/alternative wrapping the two bodies is
+   routine once an attachment or an inline image is involved, and a flat split
+   on the outermost boundary finds nothing useful inside it. */
+function collectParts(raw: string, depth = 0): Part[] {
+  if (depth > 6) return [];                      // malformed mail can loop
+
+  const { head, body } = headerBlock(raw);
+  const ctype = header(head, "content-type") || "text/plain";
+  const encoding = header(head, "content-transfer-encoding");
+
+  const boundary = ctype.match(/boundary\s*=\s*"([^"]+)"/i)?.[1] ??
+    ctype.match(/boundary\s*=\s*([^;\s]+)/i)?.[1];
+
+  if (/^multipart\//i.test(ctype) && boundary) {
+    return body
+      .split(new RegExp(`--${boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`))
+      .slice(1, -1)                              // preamble and closing marker
+      .flatMap((chunk) => collectParts(chunk.replace(/^\r?\n/, ""), depth + 1));
+  }
+
+  if (!/^text\//i.test(ctype)) return [];        // images, pdfs, calendar invites
+  return [{ type: ctype.split(";")[0].trim().toLowerCase(),
+            body: decodeBody(body, encoding) }];
+}
+
+/* RFC 2047 encoded-words. Any subject with an em dash or an emoji arrives as
+   `=?UTF-8?Q?Simone_Rocha_Sample_Sale_=E2=80=94_October_2=2D4?=`, which we
+   were storing verbatim — unreadable on a review card, and noise in the
+   prompt. Underscore means space in the Q encoding, which is why this can't
+   just reuse decodeBody. */
+function decodeHeaderWord(s: string): string {
+  return s.replace(
+    /=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g,
+    (whole, _charset, enc, text) => {
+      try {
+        const raw = enc.toUpperCase() === "B"
+          ? text
+          : text.replace(/_/g, " ");
+        return decodeBody(raw, enc.toUpperCase() === "B" ? "base64" : "quoted-printable");
+      } catch {
+        return whole;
+      }
+    },
+  ).replace(/\?=\s+=\?/g, "").trim();
+}
+
+/* Prefer the plain-text alternative; fall back to stripping the HTML one.
+   Returns "" when the message carries no readable text at all. */
+function bodyFromRaw(raw: string): { text: string; source: string } {
+  const parts = collectParts(raw);
+  const plain = parts.find((p) => p.type === "text/plain")?.body?.trim();
+  if (plain) return { text: plain, source: "text/plain" };
+
+  const html = parts.find((p) => p.type === "text/html")?.body;
+  if (html) return { text: htmlToText(html), source: "text/html" };
+
+  /* Not multipart at all — a plain message with no Content-Type. */
+  const { body } = headerBlock(raw);
+  return { text: body.trim(), source: "bare" };
+}
+
 /* ── helpers ─────────────────────────────────────────────────────────────── */
 
 /* Strip HTML down to something worth spending tokens on. Sale emails are
@@ -251,13 +386,35 @@ Deno.serve(async (req) => {
   if (!mail) return json({ error: "bad json" }, 400);
 
   const from = String(mail.from ?? "").slice(0, 200);
-  const subject = String(mail.subject ?? "").slice(0, 300);
+  const subject = decodeHeaderWord(String(mail.subject ?? "")).slice(0, 300);
   const messageId = String(mail.message_id ?? mail.messageId ?? "").slice(0, 300);
-  const body = mail.text
-    ? String(mail.text)
-    : htmlToText(String(mail.html ?? ""));
 
-  if (!body.trim()) return json({ ok: true, sales: 0, skipped: "empty body" });
+  /* `raw` is what the Worker sends now; text/html are kept so an older
+     Worker, or a hand-made test payload, still works. */
+  let body: string;
+  let source: string;
+  if (mail.raw) {
+    ({ text: body, source } = bodyFromRaw(String(mail.raw)));
+  } else if (mail.text) {
+    body = String(mail.text);
+    source = "text field";
+  } else {
+    body = htmlToText(String(mail.html ?? ""));
+    source = "html field";
+  }
+
+  /* Logged on every message. "Empty body" used to be indistinguishable from
+     "nothing worth filing" from outside, which cost an evening. */
+  console.log(
+    `from=${from} source=${source} chars=${body.trim().length} subject=${subject}`,
+  );
+
+  if (!body.trim()) {
+    console.warn("no readable text found", {
+      raw_chars: mail.raw ? String(mail.raw).length : 0,
+    });
+    return json({ ok: true, sales: 0, skipped: "empty body", source });
+  }
 
   let sales: Sale[];
   try {
