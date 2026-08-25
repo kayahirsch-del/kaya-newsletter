@@ -5,7 +5,7 @@
 
      { action: "list",   token, city_id?, status?, category?, neighborhood?,
                          q?, limit?, offset? }
-     { action: "update", token, ids: [...], status?, notes? }
+     { action: "update", token, ids: [...], status?, notes?, title?, blurb? }
 
    Auth is a single shared secret in the ADMIN_TOKEN secret. That is a
    deliberate choice for a one-person internal tool, not a claim of real
@@ -187,6 +187,30 @@ Deno.serve(async (req) => {
     if (body.notes !== undefined) {
       patch.notes = String(body.notes).slice(0, 2000) || null;
     }
+
+    /* Editing the words is a per-item act, unlike a status change, which is
+       reasonable to apply to a selection. Refusing the ambiguous case beats
+       silently writing the same sentence onto forty rows. */
+    if (body.title !== undefined || body.blurb !== undefined) {
+      if (ids.length !== 1) {
+        return json({ error: "title and blurb can only be set one item at a time" }, 400);
+      }
+      if (body.title !== undefined) {
+        const t = String(body.title).trim();
+        if (!t) return json({ error: "title cannot be empty" }, 400);
+        patch.title = t.slice(0, 300);
+      }
+      if (body.blurb !== undefined) {
+        const b = String(body.blurb).trim();
+        patch.blurb = b ? b.slice(0, 600) : null;
+
+        /* describe-items leaves "needs a human" on anything it couldn't
+           describe. A human just did, so the flag goes — unless this request
+           is setting notes itself. */
+        if (b && body.notes === undefined) patch.notes = null;
+      }
+    }
+
     if (!Object.keys(patch).length) return json({ error: "nothing to change" }, 400);
 
     const inList = ids.map((i) => `"${i}"`).join(",");

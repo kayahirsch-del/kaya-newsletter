@@ -121,15 +121,29 @@
       .filter(Boolean).join("  ·  ");
     el.appendChild(meta);
 
-    if (item.blurb) {
-      var blurb = document.createElement("p");
-      blurb.className = "card__blurb";
-      blurb.textContent = item.blurb;
-      el.appendChild(blurb);
-    }
+    /* A blurb the model couldn't write is the normal case, not an error —
+       most of these are genuinely new places nobody has written about. Say
+       so where the words would go, so the gap reads as an invitation rather
+       than a bug. */
+    var needsWords = !item.blurb || /^New licence/.test(item.blurb);
+
+    var blurb = document.createElement("p");
+    blurb.className = "card__blurb" + (needsWords ? " card__blurb--empty" : "");
+    blurb.textContent = needsWords
+      ? (item.blurb || "No description yet") + " — click to write one"
+      : item.blurb;
+    blurb.addEventListener("click", function () { openEditor(el, item); });
+    el.appendChild(blurb);
 
     var actions = document.createElement("div");
     actions.className = "card__actions";
+
+    var edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "act";
+    edit.textContent = needsWords ? "Write" : "Edit";
+    edit.addEventListener("click", function () { openEditor(el, item); });
+    actions.appendChild(edit);
 
     [["approved", "Approve", "act--yes"],
      ["rejected", "Reject", "act--no"],
@@ -155,6 +169,115 @@
 
     el.appendChild(actions);
     return el;
+  }
+
+  /* ── editing ─────────────────────────────────────────────────────────────
+     Replaces the card body in place rather than opening a dialog. Writing
+     forty blurbs is the job; a modal that has to be dismissed each time
+     turns it into forty-one. */
+
+  function openEditor(cardEl, item) {
+    if (cardEl.querySelector(".editor")) return;      // already open
+    cardEl.dataset.editing = "true";
+
+    var form = document.createElement("form");
+    form.className = "editor";
+
+    var titleLabel = document.createElement("label");
+    titleLabel.className = "editor__label";
+    titleLabel.textContent = "Name";
+    var titleInput = document.createElement("input");
+    titleInput.className = "editor__input";
+    titleInput.value = item.title;
+    /* The licence holder is often an LLC — "Prosciutto, LLC", "Corner Bistro
+       East, LLC". The real name is the one worth printing. */
+    titleInput.placeholder = "What the place is actually called";
+    titleLabel.appendChild(titleInput);
+
+    var blurbLabel = document.createElement("label");
+    blurbLabel.className = "editor__label";
+    blurbLabel.textContent = "Description";
+    var blurbInput = document.createElement("textarea");
+    blurbInput.className = "editor__input editor__input--area";
+    blurbInput.rows = 3;
+    blurbInput.maxLength = 600;
+    blurbInput.value = /^New licence/.test(item.blurb || "") ? "" : (item.blurb || "");
+    blurbInput.placeholder = "A sentence or two. What it is, what to get.";
+    blurbLabel.appendChild(blurbInput);
+
+    var row = document.createElement("div");
+    row.className = "editor__row";
+
+    var save = document.createElement("button");
+    save.type = "submit";
+    save.className = "act act--yes";
+    save.textContent = "Save";
+
+    var cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "act";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", function () { closeEditor(cardEl); });
+
+    var hint = document.createElement("span");
+    hint.className = "editor__hint";
+    hint.textContent = "⌘↵ to save · Esc to cancel";
+
+    row.appendChild(save);
+    row.appendChild(cancel);
+    row.appendChild(hint);
+
+    form.appendChild(titleLabel);
+    form.appendChild(blurbLabel);
+    form.appendChild(row);
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      saveEdit(cardEl, item, titleInput.value, blurbInput.value, hint);
+    });
+
+    form.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { closeEditor(cardEl); }
+      else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        saveEdit(cardEl, item, titleInput.value, blurbInput.value, hint);
+      }
+    });
+
+    cardEl.appendChild(form);
+    blurbInput.focus();
+  }
+
+  function closeEditor(cardEl) {
+    var form = cardEl.querySelector(".editor");
+    if (form) form.remove();
+    delete cardEl.dataset.editing;
+  }
+
+  function saveEdit(cardEl, item, title, blurb, hint) {
+    var payload = { action: "update", ids: [item.id] };
+    if (title.trim() && title.trim() !== item.title) payload.title = title.trim();
+    payload.blurb = blurb;
+
+    hint.textContent = "Saving…";
+
+    call(payload).then(function () {
+      /* Update the row in place so the queue doesn't jump — losing your
+         position after every save is what makes a long queue unbearable. */
+      if (payload.title) item.title = payload.title;
+      item.blurb = blurb.trim() || null;
+      item.notes = null;
+
+      var idx = state.items.findIndex(function (i) { return i.id === item.id; });
+      var wasActive = state.active;
+      if (idx >= 0) state.items[idx] = item;
+      render();
+      state.active = wasActive;
+      markActive();
+    }).catch(function (err) {
+      console.error(err);
+      hint.textContent = "Couldn't save — " + err.message;
+    });
   }
 
   function render() {
@@ -347,12 +470,22 @@
 
     var k = e.key.toLowerCase();
     var current = state.items[state.active];
+    var activeCard = els.queue.querySelectorAll(".card")[state.active];
+
+    /* An open editor owns the keyboard. Without this, tabbing out of the
+       textarea and hitting R to type a word would reject the row you were
+       halfway through writing. */
+    if (activeCard && activeCard.dataset.editing) return;
 
     if (k === "j") { state.active = Math.min(state.active + 1, state.items.length - 1); markActive(); e.preventDefault(); }
     else if (k === "k") { state.active = Math.max(state.active - 1, 0); markActive(); e.preventDefault(); }
     else if (k === "a" && current) { setStatus(current.id, "approved"); e.preventDefault(); }
     else if (k === "r" && current) { setStatus(current.id, "rejected"); e.preventDefault(); }
     else if (k === "u" && current) { setStatus(current.id, "new"); e.preventDefault(); }
+    else if (k === "e" && current && activeCard) {
+      openEditor(activeCard, current);
+      e.preventDefault();
+    }
   });
 
   /* ── boot ────────────────────────────────────────────────────────────── */
